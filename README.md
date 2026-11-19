@@ -1,6 +1,6 @@
 # PR Review Skill
 
-A Claude Code skill for reviewing GitHub pull requests with inline comments on the diff.
+A Claude Code / Codex skill for reviewing GitHub pull requests with inline comments on the diff.
 
 ## What It Does
 
@@ -12,19 +12,21 @@ A Claude Code skill for reviewing GitHub pull requests with inline comments on t
 ## Installation
 
 ```bash
-./install.sh
+./install.sh <profile>
 ```
 
-Installs to `~/.claude/commands/pr-review.md`.
+`<profile>` picks the agent profile to install into:
+
+| profile | destination |
+|---|---|
+| `claude-work` | `~/.claude-work/commands/pr-review.md` |
+| `claude-personal` | `~/.claude/commands/pr-review.md` |
+| `codex-work` | `~/.codex-work/skills/pr-review/SKILL.md` |
+| `codex-personal` | `~/.codex/skills/pr-review/SKILL.md` |
 
 ## Prerequisites
 
-GitHub MCP plugin must be connected and authorized. The skill uses:
-- `mcp__plugin_github_github__pull_request_read`
-- `mcp__plugin_github_github__get_file_contents`
-- `mcp__plugin_github_github__pull_request_review_write`
-
-If the MCP isn't available, the skill stops and asks you to connect it — it won't silently fall back to `gh` CLI.
+The `gh` CLI, logged in (`gh auth status`). The skill reads the PR with `gh pr view` / `gh pr diff` / `gh api .../contents`, and posts the review with `gh api .../pulls/<n>/reviews`. If `gh` isn't logged in, it stops and asks you to run `gh auth login`.
 
 ## Usage
 

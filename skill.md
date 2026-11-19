@@ -1,3 +1,8 @@
+---
+name: pr-review
+description: Review a GitHub pull request, present findings for selection, and post the chosen ones as inline diff comments in a single review.
+---
+
 # PR Review
 
 Review a GitHub pull request, present findings for user selection, then post the selected ones as inline comments on the PR diff and submit the review.
@@ -8,24 +13,15 @@ The user will provide either a PR number or a full PR URL (e.g. `https://github.
 
 If no PR is specified, ask the user which one to review before doing anything else.
 
-## Step 1 — Check GitHub MCP availability
+## Step 1 — Check `gh` is authenticated
 
-Prefer the GitHub MCP plugin for everything. The tools you need are:
-- `mcp__plugin_github_github__pull_request_read` — PR metadata + diff
-- `mcp__plugin_github_github__get_file_contents` — file contents at a specific SHA
-- `mcp__plugin_github_github__pull_request_review_write` — post a review with inline comments
-
-Before doing any review work, verify these tools are available. If they aren't connected or authorized, **stop and tell the user**:
-
-> GitHub MCP isn't available in this session. Please connect/authorize it and retry — I won't silently fall back to `gh` CLI.
-
-Do not proceed with `gh` CLI unless the user explicitly asks you to.
+Everything goes through the `gh` CLI. Run `gh auth status`; if it isn't logged in, **stop and tell the user** to run `! gh auth login`.
 
 ## Step 2 — Fetch PR data
 
-1. Get PR metadata including `headRefOid` (the head commit SHA) and the list of changed files.
-2. Get the diff.
-3. For each changed file, fetch its contents at `headRefOid` so you have the exact line numbers in the current PR state. **Do not estimate line numbers from diff hunk headers** — always read the actual file.
+1. Get PR metadata including `headRefOid` (the head commit SHA) and the list of changed files: `gh pr view <n> -R <org>/<repo> --json headRefOid,baseRefName,title,files`.
+2. Get the diff: `gh pr diff <n> -R <org>/<repo>`.
+3. For each changed file, fetch its contents at `headRefOid` so you have the exact line numbers in the current PR state: `gh api "repos/<org>/<repo>/contents/<path>?ref=<headSHA>" -H "Accept: application/vnd.github.raw"`. **Do not estimate line numbers from diff hunk headers** — always read the actual file.
 
 ## Step 3 — Priority list (tweakable)
 
@@ -87,9 +83,9 @@ Never silently drop a finding because its line isn't in the diff. Always post; a
 
 ### Posting the review
 
-Use `mcp__plugin_github_github__pull_request_review_write` with:
+Write the review JSON to a temp file (e.g. `/tmp/pr-review-<n>.json`) and post it with `gh api repos/<org>/<repo>/pulls/<n>/reviews --input /tmp/pr-review-<n>.json`. The JSON has:
 - `event`: `COMMENT` (not `APPROVE` or `REQUEST_CHANGES` unless the user explicitly asked)
-- `commitId`: the `headRefOid` from Step 2
+- `commit_id`: the `headRefOid` from Step 2
 - `comments[]`: one entry per selected finding, each with `path`, `line`, `side: "RIGHT"`, and `body`
 - **No top-level `body`** — the user does not want a general summary comment on the PR, only the inline ones
 
@@ -109,7 +105,7 @@ After the review is posted, tell the user:
 
 | Step | Action |
 |------|--------|
-| 1 | Check GitHub MCP is available; stop if not |
+| 1 | Check `gh auth status`; stop if not logged in |
 | 2 | Fetch PR metadata, diff, and each changed file's contents at head SHA |
 | 3 | Analyze against priority list (tweakable) |
 | 4 | Present numbered findings with clickable `blob/<sha>/path#Lline` links |
@@ -119,7 +115,6 @@ After the review is posted, tell the user:
 ## Common mistakes
 
 - **Estimating line numbers from diff hunks.** Always read the file at `headSHA`.
-- **Falling back to `gh` CLI silently** when GitHub MCP isn't connected. Tell the user first.
 - **Adding a top-level review body.** The user wants only inline comments, no general summary.
 - **Dropping a finding because its line isn't in the diff.** Anchor to a nearby diff-visible line and reference the real line in the body.
 - **Submitting multiple reviews** for the same batch. Use one review with all selected comments.
